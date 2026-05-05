@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Card Print Layout — 54×85mm on A4</title>
+<style>
+  :root {
+    --card-w: 54mm;
+    --card-h: 85mm;
+    --gap: 2mm;
+    --page-margin: 10mm;
+    --line-color: #888;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #e8e8e8;
+    color: #222;
+  }
+
+  /* ---- Controls (hidden when printing) ---- */
+  .controls {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: #fff;
+    border-bottom: 1px solid #ccc;
+    padding: 14px 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  }
+
+  .controls h1 {
+    font-size: 15px;
+    margin: 0 12px 0 0;
+    font-weight: 600;
+  }
+
+  .controls label {
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .controls input[type="number"] {
+    width: 60px;
+    padding: 4px 6px;
+    border: 1px solid #bbb;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+
+  .controls button {
+    padding: 6px 14px;
+    border: 1px solid #2563eb;
+    background: #2563eb;
+    color: white;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .controls button:hover {
+    background: #1d4ed8;
+  }
+
+  .controls button.secondary {
+    background: white;
+    color: #2563eb;
+  }
+
+  .drop-zone {
+    flex: 1;
+    min-width: 220px;
+    border: 2px dashed #999;
+    border-radius: 6px;
+    padding: 10px 14px;
+    text-align: center;
+    font-size: 13px;
+    color: #555;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .drop-zone:hover, .drop-zone.dragover {
+    border-color: #2563eb;
+    background: #f0f5ff;
+    color: #2563eb;
+  }
+
+  .drop-zone input { display: none; }
+
+  .info {
+    font-size: 12px;
+    color: #666;
+  }
+
+  /* ---- Pages ---- */
+  .pages {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .page {
+    width: 210mm;
+    height: 297mm;
+    background: white;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+    padding: var(--page-margin);
+    display: grid;
+    grid-template-columns: repeat(3, var(--card-w));
+    grid-auto-rows: var(--card-h);
+    gap: var(--gap);
+    align-content: start;
+    justify-content: center;
+    position: relative;
+  }
+
+  .card {
+    width: var(--card-w);
+    height: var(--card-h);
+    overflow: hidden;
+    border: 0.2mm solid var(--line-color);
+    background: #f4f4f4;
+    position: relative;
+  }
+
+  .card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #888;
+  }
+
+  .empty-state h2 {
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+
+  /* ---- Print ---- */
+  @media print {
+    body { background: white; }
+    .controls { display: none !important; }
+    .pages { padding: 0; gap: 0; }
+    .page {
+      box-shadow: none;
+      page-break-after: always;
+      margin: 0;
+    }
+    .page:last-child { page-break-after: auto; }
+  }
+
+  @page {
+    size: A4;
+    margin: 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <h1>Card Layout</h1>
+
+  <label class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept="image/png,image/webp,image/jpeg" multiple>
+    <span id="dropLabel">Click or drop images here (PNG/WebP/JPG)</span>
+  </label>
+
+  <label>Card W <input type="number" id="cardW" value="54" min="10" max="200" step="0.5">mm</label>
+  <label>Card H <input type="number" id="cardH" value="85" min="10" max="280" step="0.5">mm</label>
+  <label>Gap <input type="number" id="gap" value="2" min="0" max="20" step="0.5">mm</label>
+
+  <button id="printBtn">Print / Save PDF</button>
+  <button class="secondary" id="clearBtn">Clear</button>
+
+  <span class="info" id="info">No images loaded</span>
+</div>
+
+<div class="pages" id="pages">
+  <div class="empty-state">
+    <h2>Drop your card images above</h2>
+    <p>They'll auto-arrange onto A4 pages. Press Ctrl/Cmd+P or the Print button to save as PDF.</p>
+  </div>
+</div>
+
+<script>
+  const fileInput = document.getElementById('fileInput');
+  const dropZone = document.getElementById('dropZone');
+  const dropLabel = document.getElementById('dropLabel');
+  const pagesEl = document.getElementById('pages');
+  const info = document.getElementById('info');
+  const cardWInput = document.getElementById('cardW');
+  const cardHInput = document.getElementById('cardH');
+  const gapInput = document.getElementById('gap');
+
+  let images = []; // array of object URLs
+
+  // Drag & drop
+  dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+  });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    handleFiles(e.dataTransfer.files);
+  });
+
+  fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+  function handleFiles(fileList) {
+    const files = Array.from(fileList)
+      .filter(f => f.type.startsWith('image/'))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+    // Revoke old URLs to free memory
+    images.forEach(url => URL.revokeObjectURL(url));
+    images = files.map(f => URL.createObjectURL(f));
+
+    render();
+  }
+
+  function calcPerPage() {
+    const cardW = parseFloat(cardWInput.value);
+    const cardH = parseFloat(cardHInput.value);
+    const gap = parseFloat(gapInput.value);
+    const margin = 10; // mm
+    const usableW = 210 - 2 * margin;
+    const usableH = 297 - 2 * margin;
+
+    const cols = Math.floor((usableW + gap) / (cardW + gap));
+    const rows = Math.floor((usableH + gap) / (cardH + gap));
+    return { cols: Math.max(1, cols), rows: Math.max(1, rows), cardW, cardH, gap };
+  }
+
+  function render() {
+    pagesEl.innerHTML = '';
+
+    if (images.length === 0) {
+      pagesEl.innerHTML = `
+        <div class="empty-state">
+          <h2>Drop your card images above</h2>
+          <p>They'll auto-arrange onto A4 pages. Press Ctrl/Cmd+P or the Print button to save as PDF.</p>
+        </div>`;
+      info.textContent = 'No images loaded';
+      dropLabel.textContent = 'Click or drop images here (PNG/WebP/JPG)';
+      return;
+    }
+
+    const { cols, rows, cardW, cardH, gap } = calcPerPage();
+    const perPage = cols * rows;
+    const pageCount = Math.ceil(images.length / perPage);
+
+    document.documentElement.style.setProperty('--card-w', cardW + 'mm');
+    document.documentElement.style.setProperty('--card-h', cardH + 'mm');
+    document.documentElement.style.setProperty('--gap', gap + 'mm');
+
+    for (let p = 0; p < pageCount; p++) {
+      const page = document.createElement('div');
+      page.className = 'page';
+      page.style.gridTemplateColumns = `repeat(${cols}, ${cardW}mm)`;
+
+      const slice = images.slice(p * perPage, (p + 1) * perPage);
+      slice.forEach(src => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        const img = document.createElement('img');
+        img.src = src;
+        card.appendChild(img);
+        page.appendChild(card);
+      });
+
+      pagesEl.appendChild(page);
+    }
+
+    info.textContent = `${images.length} cards · ${cols}×${rows} per page · ${pageCount} page${pageCount > 1 ? 's' : ''}`;
+    dropLabel.textContent = `${images.length} images loaded — click to replace`;
+  }
+
+  // Re-render on size changes
+  [cardWInput, cardHInput, gapInput].forEach(el => {
+    el.addEventListener('input', render);
+  });
+
+  document.getElementById('printBtn').addEventListener('click', () => window.print());
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    images.forEach(url => URL.revokeObjectURL(url));
+    images = [];
+    fileInput.value = '';
+    render();
+  });
+</script>
+
+</body>
+</html>
