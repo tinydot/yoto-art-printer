@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Card Print Layout — 54×85mm on A4</title>
+<title>Card Print Layout — Yoto cards on A4</title>
 <style>
   :root {
     --card-w: 54mm;
@@ -48,6 +48,13 @@
     display: flex;
     align-items: center;
     gap: 6px;
+  }
+
+  .controls select {
+    padding: 4px 6px;
+    border: 1px solid #bbb;
+    border-radius: 4px;
+    font-size: 13px;
   }
 
   .controls input[type="number"] {
@@ -183,6 +190,13 @@
     <span id="dropLabel">Click or drop images here (PNG/WebP/JPG)</span>
   </label>
 
+  <label>Size
+    <select id="sizePreset">
+      <option value="54x85">Card 54×85mm</option>
+      <option value="60x60">Square 60×60mm</option>
+      <option value="custom">Custom</option>
+    </select>
+  </label>
   <label>Card W <input type="number" id="cardW" value="54" min="10" max="200" step="0.5">mm</label>
   <label>Card H <input type="number" id="cardH" value="85" min="10" max="280" step="0.5">mm</label>
   <label>Gap <input type="number" id="gap" value="2" min="0" max="20" step="0.5">mm</label>
@@ -209,6 +223,7 @@
   const cardWInput = document.getElementById('cardW');
   const cardHInput = document.getElementById('cardH');
   const gapInput = document.getElementById('gap');
+  const sizePreset = document.getElementById('sizePreset');
 
   let images = []; // array of object URLs
 
@@ -295,9 +310,27 @@
     dropLabel.textContent = `${images.length} images loaded — click to replace`;
   }
 
+  // Size presets: picking one fills W/H; editing W/H selects the matching preset (or Custom)
+  function syncPresetFromInputs() {
+    const key = `${parseFloat(cardWInput.value)}x${parseFloat(cardHInput.value)}`;
+    const match = Array.from(sizePreset.options).some(o => o.value === key);
+    sizePreset.value = match ? key : 'custom';
+  }
+
+  sizePreset.addEventListener('change', () => {
+    if (sizePreset.value === 'custom') return;
+    const [w, h] = sizePreset.value.split('x');
+    cardWInput.value = w;
+    cardHInput.value = h;
+    render();
+  });
+
   // Re-render on size changes
   [cardWInput, cardHInput, gapInput].forEach(el => {
-    el.addEventListener('input', render);
+    el.addEventListener('input', () => {
+      syncPresetFromInputs();
+      render();
+    });
   });
 
   document.getElementById('printBtn').addEventListener('click', () => window.print());
