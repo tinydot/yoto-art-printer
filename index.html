@@ -143,6 +143,10 @@
     position: relative;
   }
 
+  .card.blank {
+    background: white;
+  }
+
   .card img {
     width: 100%;
     height: 100%;
@@ -201,6 +205,9 @@
   <label>Card H <input type="number" id="cardH" value="85" min="10" max="280" step="0.5">mm</label>
   <label>Gap <input type="number" id="gap" value="2" min="0" max="20" step="0.5">mm</label>
 
+  <label><input type="checkbox" id="blankMode"> Blank frames</label>
+  <label>Pages <input type="number" id="blankPages" value="1" min="1" max="50" step="1"></label>
+
   <button id="printBtn">Print / Save PDF</button>
   <button class="secondary" id="clearBtn">Clear</button>
 
@@ -211,6 +218,7 @@
   <div class="empty-state">
     <h2>Drop your card images above</h2>
     <p>They'll auto-arrange onto A4 pages. Press Ctrl/Cmd+P or the Print button to save as PDF.</p>
+    <p>Want to draw your own? Tick <strong>Blank frames</strong> to print empty frames instead.</p>
   </div>
 </div>
 
@@ -224,6 +232,8 @@
   const cardHInput = document.getElementById('cardH');
   const gapInput = document.getElementById('gap');
   const sizePreset = document.getElementById('sizePreset');
+  const blankMode = document.getElementById('blankMode');
+  const blankPages = document.getElementById('blankPages');
 
   let images = []; // array of object URLs
 
@@ -269,11 +279,14 @@
   function render() {
     pagesEl.innerHTML = '';
 
-    if (images.length === 0) {
+    const blank = blankMode.checked;
+
+    if (!blank && images.length === 0) {
       pagesEl.innerHTML = `
         <div class="empty-state">
           <h2>Drop your card images above</h2>
           <p>They'll auto-arrange onto A4 pages. Press Ctrl/Cmd+P or the Print button to save as PDF.</p>
+    <p>Want to draw your own? Tick <strong>Blank frames</strong> to print empty frames instead.</p>
         </div>`;
       info.textContent = 'No images loaded';
       dropLabel.textContent = 'Click or drop images here (PNG/WebP/JPG)';
@@ -282,7 +295,11 @@
 
     const { cols, rows, cardW, cardH, gap } = calcPerPage();
     const perPage = cols * rows;
-    const pageCount = Math.ceil(images.length / perPage);
+    // Blank mode: fill the requested number of pages with empty frames (images are ignored, not cleared)
+    const pageCount = blank
+      ? Math.max(1, parseInt(blankPages.value, 10) || 1)
+      : Math.ceil(images.length / perPage);
+    const items = blank ? new Array(pageCount * perPage).fill(null) : images;
 
     document.documentElement.style.setProperty('--card-w', cardW + 'mm');
     document.documentElement.style.setProperty('--card-h', cardH + 'mm');
@@ -293,10 +310,15 @@
       page.className = 'page';
       page.style.gridTemplateColumns = `repeat(${cols}, ${cardW}mm)`;
 
-      const slice = images.slice(p * perPage, (p + 1) * perPage);
+      const slice = items.slice(p * perPage, (p + 1) * perPage);
       slice.forEach(src => {
         const card = document.createElement('div');
         card.className = 'card';
+        if (!src) {
+          card.classList.add('blank');
+          page.appendChild(card);
+          return;
+        }
         const img = document.createElement('img');
         img.src = src;
         card.appendChild(img);
@@ -306,8 +328,10 @@
       pagesEl.appendChild(page);
     }
 
-    info.textContent = `${images.length} cards · ${cols}×${rows} per page · ${pageCount} page${pageCount > 1 ? 's' : ''}`;
-    dropLabel.textContent = `${images.length} images loaded — click to replace`;
+    info.textContent = `${items.length} ${blank ? 'blank frames' : 'cards'} · ${cols}×${rows} per page · ${pageCount} page${pageCount > 1 ? 's' : ''}`;
+    dropLabel.textContent = images.length
+      ? `${images.length} images loaded — click to replace`
+      : 'Click or drop images here (PNG/WebP/JPG)';
   }
 
   // Size presets: picking one fills W/H; editing W/H selects the matching preset (or Custom)
@@ -326,6 +350,9 @@
   });
 
   // Re-render on size changes
+  blankMode.addEventListener('change', render);
+  blankPages.addEventListener('input', render);
+
   [cardWInput, cardHInput, gapInput].forEach(el => {
     el.addEventListener('input', () => {
       syncPresetFromInputs();

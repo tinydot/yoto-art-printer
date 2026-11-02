@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Single-page web tool that arranges uploaded card-art images onto A4 sheets sized for Yoto cards (54×85mm by default, with a 60×60mm square preset; any custom size can be entered), then uses the browser's native print dialog to output a PDF or printed page.
+Single-page web tool that arranges uploaded card-art images onto A4 sheets sized for Yoto cards (54×85mm by default, with a 60×60mm square preset; any custom size can be entered), then uses the browser's native print dialog to output a PDF or printed page. A "Blank frames" mode prints N pages of empty frames (at the current size) for drawing by hand; uploaded images are kept but ignored while it is on.
 
 ## Architecture
 
